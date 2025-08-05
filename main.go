@@ -7,85 +7,76 @@ import (
 
 	"gb-player/gb"
 
-	"github.com/veandco/go-sdl2/sdl"
+	"github.com/AllenDang/cimgui-go/backend"
+	"github.com/AllenDang/cimgui-go/backend/sdlbackend"
+	"github.com/AllenDang/cimgui-go/imgui"
 )
+
+var currentBackend backend.Backend[sdlbackend.SDLWindowFlags]
 
 func init() {
 	runtime.LockOSThread()
 }
 
+func showDebugWindow() {
+	imgui.Text(fmt.Sprintf("Framerate: %.1f FPS", imgui.CurrentIO().Framerate()))
+}
+
+func showROMWindow(cartridge *gb.Cartridge) {
+	imgui.Begin("ROM")
+
+	imgui.Text(fmt.Sprintf("Title: %s", cartridge.Title))
+	imgui.Text(fmt.Sprintf("Mapper: %s", cartridge.Mapper))
+	imgui.Text(fmt.Sprintf("Licensee: %s", cartridge.Licensee))
+	if cartridge.SGBSupport {
+		imgui.Text("Super Game Boy support?: Yes")
+	} else {
+		imgui.Text("Super Game Boy support?: No")
+	}
+	imgui.Text(fmt.Sprintf("ROM size: %d bytes", cartridge.ROMSize))
+	imgui.Text(fmt.Sprintf("RAM size: %s", cartridge.RAMSize))
+	imgui.Text(fmt.Sprintf("Publication: %s", cartridge.Destination))
+	imgui.Text(fmt.Sprintf("ROM version: %d", cartridge.Version))
+
+	imgui.End()
+}
+
+func showCPUWindow(cpu *gb.Cpu) {
+	imgui.Begin("CPU")
+
+	imgui.Text(fmt.Sprintf("PC: %d", cpu.PC))
+
+	imgui.End()
+}
+
 func main() {
-	cartridge := gb.Insert("rom.gb")
-	fmt.Println("Title:", cartridge.Title)
-	fmt.Println("Mapper:", cartridge.Mapper)
-	fmt.Println("Licensee:", cartridge.Licensee)
-	fmt.Println("Super Game Boy support?", cartridge.SGBSupport)
-	fmt.Println("ROM size:", cartridge.ROMSize, "bytes")
-	fmt.Println("RAM size:", cartridge.RAMSize)
-	fmt.Println("Publication destination:", cartridge.Destination)
-	fmt.Println("ROM version:", cartridge.Version)
-	fmt.Println()
-
-	cpu := gb.Reset()
-	fmt.Println("Program counter:", cpu.PC)
-	gb.Tick(&cpu)
-	fmt.Println("Program counter:", cpu.PC)
-
-	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
+	currentBackend, err := backend.CreateBackend(sdlbackend.NewSDLBackend())
+	if err != nil {
 		log.Fatal(err)
 	}
-	defer sdl.Quit()
 
-	window, err := sdl.CreateWindow(
-		"GB Player",
-		sdl.WINDOWPOS_UNDEFINED,
-		sdl.WINDOWPOS_UNDEFINED,
-		800, 600,
-		sdl.WINDOW_SHOWN)
-	if err != nil {
-		panic(err)
-	}
-	defer window.Destroy()
+	currentBackend.SetBgColor(imgui.NewVec4(0.45, 0.55, 0.6, 1.0))
 
-	renderer, err := sdl.CreateRenderer(window, -1, 0)
-	if err != nil {
-		panic(err)
-	}
-	defer renderer.Destroy()
+	currentBackend.CreateWindow("GB Player", 1200, 900)
 
-	renderer.RenderSetVSync(true)
-	renderer.SetDrawColor(0x63, 0x94, 0xED, 0xff)
+	currentBackend.SetDropCallback(func(p []string) {
+		fmt.Printf("drop triggered: %v", p)
+	})
 
-	var frameCount uint32 = 0
-	var startTicks = sdl.GetTicks()
+	currentBackend.SetCloseCallback(func() {
+		fmt.Println("window is closing")
+	})
 
-	running := true
-	for running {
-		// frameStartTime := sdl.GetTicks()
+	cartridge := gb.Insert("rom.gb")
+	cpu := gb.Reset()
 
-		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			switch event.(type) {
-			case *sdl.QuitEvent:
-				println("Quit")
-				running = false
-				break
-			}
-		}
+	currentBackend.Run(func() {
+		imgui.ClearSizeCallbackPool()
 
-		renderer.Clear()
-		renderer.Present()
+		gb.Tick(&cpu)
 
-		// Calculate framerate
-		frameCount++
-		currentTicks := sdl.GetTicks()
-		elapsed := currentTicks - startTicks
-		if elapsed >= 1000 {
-			fps := float32(frameCount) / (float32(elapsed) / 1000.0)
-            fmt.Printf("FPS: %.2f\n", fps)
-
-            // Reset counters
-            frameCount = 0
-            startTicks = currentTicks
-		}
-	}
+		showDebugWindow()
+		showROMWindow(&cartridge)
+		showCPUWindow(&cpu)
+	})
 }

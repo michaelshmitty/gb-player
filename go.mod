@@ -3,8 +3,8 @@ module gb-player
 go 1.24.5
 
 require (
+	github.com/AllenDang/cimgui-go v1.3.1
 	github.com/stretchr/testify v1.10.0
-	github.com/veandco/go-sdl2 v0.4.40
 )
 
 require (
