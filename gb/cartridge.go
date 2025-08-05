@@ -1,6 +1,7 @@
 package gb
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"log"
@@ -53,7 +54,7 @@ var cartridgeTypes = map[byte]string{
 // RAM sizes
 // https://gbdev.io/pandocs/The_Cartridge_Header.html#0149--ram-size
 var ramSizes = map[byte]string{
-	0x00: "0 - No RAM ",
+	0x00: "0 - No RAM",
 	0x01: "UNUSED VALUE",
 	0x02: "8 KiB - 1 bank",
 	0x03: "32 KiB - 4 banks of 8 KiB each",
@@ -244,7 +245,7 @@ type Cartridge struct {
 }
 
 func Insert(filename string) Cartridge {
-	file, err := os.Open("rom.gb")
+	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -270,7 +271,7 @@ func Insert(filename string) Cartridge {
 	}
 
 	// Convert some header values
-	cartridge.Title = string(header.Title[:])
+	cartridge.Title = string(bytes.Trim(header.Title[:], "\x00"))
 	cartridge.Mapper = cartridgeTypes[header.CartridgeType]
 	if header.OldLicenseeCode == 0x33 {
 		// FIXME(m): Support new licensee codes
