@@ -1,4 +1,4 @@
-package gb
+package main
 
 import (
 	"bytes"
@@ -282,11 +282,12 @@ func Insert(filename string) Cartridge {
 	cartridge.SGBSupport = (header.SGBFlag == 0x03)
 	cartridge.ROMSize = 32 * (1 << header.ROMSize)
 	cartridge.RAMSize = ramSizes[header.RAMSize]
-	if header.DestinationCode == 0x00 {
+	switch header.DestinationCode {
+	case 0x00:
 		cartridge.Destination = "Japan (and possibly overseas)"
-	} else if header.DestinationCode == 0x01 {
+	case 0x01:
 		cartridge.Destination = "Overseas only"
-	} else {
+	default:
 		cartridge.Destination = "UNKNOWN"
 	}
 	cartridge.Version = int(header.MaskROMVersionNumber)

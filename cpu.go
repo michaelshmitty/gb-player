@@ -1,4 +1,4 @@
-package gb
+package main
 
 type Cpu struct {
 	A     uint8
