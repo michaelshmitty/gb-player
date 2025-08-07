@@ -7,7 +7,7 @@ import (
 )
 
 func TestInsertCartridge(t *testing.T) {
-	cartridge := Insert("../rom.gb")
+	cartridge := Insert("rom.gb")
 	assert := assert.New(t)
 
 	assert.Equal(cartridge.Title, "SEIKEN DENSETSU")
