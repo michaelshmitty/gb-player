@@ -51,10 +51,15 @@ func (c *Controller) Run() {
 	running := true
 	for running {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			switch event.(type) {
+			switch e := event.(type) {
 			case *sdl.QuitEvent:
-				println("Quit")
 				running = false
+			case *sdl.KeyboardEvent:
+				if e.Type == sdl.KEYDOWN {
+					if e.Keysym.Sym == sdl.K_ESCAPE {
+						running = false
+					}
+				}
 			}
 		}
 
