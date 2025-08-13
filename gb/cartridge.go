@@ -7,17 +7,7 @@ import (
 	"os"
 )
 
-// See https://gbdev.io/pandocs/The_Cartridge_Header.html#0104-0133--nintendo-logo
-var expectedLogo = [48]byte{
-	0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B,
-	0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
-	0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
-	0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
-	0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
-	0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E,
-}
-
-// Cartridge types
+// Cartridge types aka Mappers
 // See https://gbdev.io/pandocs/The_Cartridge_Header.html#0147--cartridge-type
 var cartridgeTypes = map[byte]string{
 	0x00: "ROM ONLY",
@@ -233,6 +223,7 @@ type ROMHeader struct {
 }
 
 type Cartridge struct {
+	Data        []byte
 	Filename    string
 	Mapper      string
 	Title       string
@@ -246,53 +237,62 @@ type Cartridge struct {
 }
 
 func InsertCartridge(filename string) (*Cartridge, error) {
-	cartridge := Cartridge{Filename: filename}
+	cart := Cartridge{Filename: filename}
 
-	rom, err := os.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
-		return &cartridge, err
+		return &cart, err
 	}
+	cart.Data = data
 
 	// Read header
 	var header ROMHeader
-	buffer := bytes.NewReader(rom)
+	buffer := bytes.NewReader(cart.Data)
 	err = binary.Read(buffer, binary.LittleEndian, &header)
 	if err != nil {
-		return &cartridge, nil
+		return &cart, nil
 	}
 
 	// Convert some header values
-	cartridge.Title = string(bytes.Trim(header.Title[:], "\x00"))
-	cartridge.Mapper = cartridgeTypes[header.CartridgeType]
+	cart.Title = string(bytes.Trim(header.Title[:], "\x00"))
+	cart.Mapper = cartridgeTypes[header.CartridgeType]
 	if header.OldLicenseeCode == 0x33 {
 		// FIXME(m): Support new licensee codes
-		cartridge.Licensee = "Indicates that the New licensee code should be used instead."
+		cart.Licensee = "Indicates that the New licensee code should be used instead."
 	} else {
-		cartridge.Licensee = oldLicensees[header.OldLicenseeCode]
+		cart.Licensee = oldLicensees[header.OldLicenseeCode]
 	}
-	cartridge.SGBSupport = (header.SGBFlag == 0x03)
-	cartridge.ROMSize = 32 * (1 << header.ROMSize)
-	cartridge.RAMSize = ramSizes[header.RAMSize]
+	cart.SGBSupport = (header.SGBFlag == 0x03)
+	cart.ROMSize = 32 * (1 << header.ROMSize)
+	cart.RAMSize = ramSizes[header.RAMSize]
 	switch header.DestinationCode {
 	case 0x00:
-		cartridge.Destination = "Japan (and possibly overseas)"
+		cart.Destination = "Japan (and possibly overseas)"
 	case 0x01:
-		cartridge.Destination = "Overseas only"
+		cart.Destination = "Overseas only"
 	default:
-		cartridge.Destination = "UNKNOWN"
+		cart.Destination = "UNKNOWN"
 	}
-	cartridge.Version = int(header.MaskROMVersionNumber)
+	cart.Version = int(header.MaskROMVersionNumber)
 
 	// Calculate and verify checksum
 	for address := uint16(0x0134); address <= uint16(0x014C); address++ {
-		cartridge.Checksum = cartridge.Checksum - rom[address] - 1
+		cart.Checksum = cart.Checksum - cart.Data[address] - 1
 	}
-	if cartridge.Checksum != header.Checksum {
-		return &cartridge, fmt.Errorf("ROM checksum failed: %X does not equal %X", cartridge.Checksum, header.Checksum)
+	if cart.Checksum != header.Checksum {
+		return &cart, fmt.Errorf("ROM checksum failed: %X does not equal %X", cart.Checksum, header.Checksum)
 	}
 
 	// NOTE(m): Ignoring global checksum which is not used, except by one emulator.
 	// See https://gbdev.io/pandocs/The_Cartridge_Header.html#014e-014f--global-checksum
 
-	return &cartridge, nil
+	return &cart, nil
+}
+
+func (cart *Cartridge) Read(address uint16) (byte, error) {
+	return cart.Data[address], nil
+}
+
+func (cart *Cartridge) Write(address uint16, value byte) error {
+	return fmt.Errorf("Writing to cartridge address %X not implemented!", address)
 }

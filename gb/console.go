@@ -11,15 +11,20 @@ const (
 )
 
 type Console struct {
-	Cartridge *Cartridge
-	front     *image.RGBA
+	Bus   *Bus
+	CPU   *CPU
+	front *image.RGBA
 }
 
 func NewConsole(path string) (*Console, error) {
-	cartridge := InsertCartridge(path)
+	cartridge, err := InsertCartridge(path)
+	if err != nil {
+		return &Console{}, err
+	}
 	buffer := image.NewRGBA(image.Rect(0, 0, ConsoleWidth, ConsoleHeight))
 
-	console := Console{Cartridge: cartridge, front: buffer}
+	bus := NewBus(cartridge)
+	console := Console{Bus: bus, CPU: NewCPU(bus), front: buffer}
 
 	return &console, nil
 }

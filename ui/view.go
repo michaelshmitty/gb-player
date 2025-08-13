@@ -22,8 +22,7 @@ func (view *View) Update(dt uint64) {
 	console := view.console
 	renderer := view.controller.renderer
 
-	// console.StepMilliSeconds(dt)
-	console.StepMilliSeconds(sdl.GetTicks64())
+	console.StepMilliSeconds(dt)
 
 	buffer := console.Buffer()
 
