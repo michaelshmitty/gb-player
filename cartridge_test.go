@@ -7,15 +7,15 @@ import (
 )
 
 func TestInsertCartridge(t *testing.T) {
-	cartridge := Insert("rom.gb")
+	cartridge := Insert("./roms/dmg-acid2.gb")
 	assert := assert.New(t)
 
-	assert.Equal(cartridge.Title, "SEIKEN DENSETSU")
-	assert.Equal(cartridge.Mapper, "MBC2+BATTERY")
-	assert.Equal(cartridge.Licensee, "Square")
+	assert.Equal(cartridge.Title, "DMG-ACID2")
+	assert.Equal(cartridge.Mapper, "ROM ONLY")
+	assert.Equal(cartridge.Licensee, "None")
 	assert.False(cartridge.SGBSupport, "SGB support should be false")
-	assert.Equal(cartridge.ROMSize, 256)
+	assert.Equal(cartridge.ROMSize, 32)
 	assert.Equal(cartridge.RAMSize, "0 - No RAM")
-	assert.Equal(cartridge.Destination, "Overseas only")
+	assert.Equal(cartridge.Destination, "Japan (and possibly overseas)")
 	assert.Equal(cartridge.Version, 0)
 }

@@ -10,7 +10,7 @@ func main() {
 	// 	log.Fatalln("No rom file specified")
 	// }
 	// romPath := os.Args[1]
-	romPath := "rom.gb"
+	romPath := "./roms/dmg-acid2.gb"
 
 	ui.Run(romPath)
 }
