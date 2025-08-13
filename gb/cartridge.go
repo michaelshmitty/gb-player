@@ -3,8 +3,7 @@ package gb
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
-	"log"
+	"fmt"
 	"os"
 )
 
@@ -215,6 +214,7 @@ var oldLicensees = map[byte]string{
 }
 
 type ROMHeader struct {
+	_          [256]byte
 	EntryPoint [4]byte
 	Logo       [48]byte
 	// NOTE(m): Assuming "old" cartridges here. This may cause problems with newer cartridges.
@@ -228,7 +228,7 @@ type ROMHeader struct {
 	DestinationCode      byte
 	OldLicenseeCode      byte
 	MaskROMVersionNumber byte
-	HeaderChecksum       byte
+	Checksum             byte
 	GlobalChecksum       [2]byte
 }
 
@@ -242,32 +242,23 @@ type Cartridge struct {
 	RAMSize     string
 	Destination string
 	Version     int
+	Checksum    byte
 }
 
-func InsertCartridge(path string) *Cartridge {
-	file, err := os.Open(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-	cartridge := Cartridge{Filename: file.Name()}
+func InsertCartridge(filename string) (*Cartridge, error) {
+	cartridge := Cartridge{Filename: filename}
 
-	// Jump to start of header
-	_, err = file.Seek(0x0100, io.SeekStart)
+	rom, err := os.ReadFile(filename)
 	if err != nil {
-		log.Fatal(err)
+		return &cartridge, err
 	}
 
 	// Read header
 	var header ROMHeader
-	err = binary.Read(file, binary.LittleEndian, &header)
+	buffer := bytes.NewReader(rom)
+	err = binary.Read(buffer, binary.LittleEndian, &header)
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Validate the ROM by checking presence of the Nintendo logo
-	if header.Logo != expectedLogo {
-		log.Fatal("Invalid ROM file: No valid logo found!")
+		return &cartridge, nil
 	}
 
 	// Convert some header values
@@ -292,10 +283,16 @@ func InsertCartridge(path string) *Cartridge {
 	}
 	cartridge.Version = int(header.MaskROMVersionNumber)
 
-	// TODO(m): Verify header checksum
+	// Calculate and verify checksum
+	for address := uint16(0x0134); address <= uint16(0x014C); address++ {
+		cartridge.Checksum = cartridge.Checksum - rom[address] - 1
+	}
+	if cartridge.Checksum != header.Checksum {
+		return &cartridge, fmt.Errorf("ROM checksum failed: %X does not equal %X", cartridge.Checksum, header.Checksum)
+	}
 
 	// NOTE(m): Ignoring global checksum which is not used, except by one emulator.
 	// See https://gbdev.io/pandocs/The_Cartridge_Header.html#014e-014f--global-checksum
 
-	return &cartridge
+	return &cartridge, nil
 }
