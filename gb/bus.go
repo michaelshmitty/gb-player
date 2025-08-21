@@ -14,16 +14,18 @@ func NewBus(cart *Cartridge) *Bus {
 	return &bus
 }
 
-func (bus *Bus) Read(address uint16) (byte, error) {
+func (bus *Bus) Read(address uint16) byte {
 	if address < 0x8000 {
 		// ROM data
 		value, err := bus.Cart.Read(address)
 		if err != nil {
-			return 0, fmt.Errorf("Error reading from bus address %X: %s", address, err)
+			fmt.Printf("Error reading from bus address %X: %s", address, err)
+			return 0
 		}
-		return value, nil
+		return value
 	} else {
-		return 0, fmt.Errorf("Reading from bus address %X not implemented!", address)
+		fmt.Printf("Reading from bus address %X not implemented!\n", address)
+		return 0
 	}
 }
 

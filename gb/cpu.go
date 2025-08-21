@@ -2,13 +2,23 @@ package gb
 
 import (
 	"fmt"
+	"os"
 )
 
 const CPUFrequency = 4194304
 
+type CPUFlags byte
+
+const (
+	C CPUFlags = 1 << 4 // Carry Flag
+	H CPUFlags = 1 << 5 // Half Carry Flag
+	N CPUFlags = 1 << 6 // Subtract Flag
+	Z CPUFlags = 1 << 7 // Zero Flag
+)
+
 type Registers struct {
 	A  byte
-	F  byte
+	F  CPUFlags
 	B  byte
 	C  byte
 	D  byte
@@ -20,62 +30,83 @@ type Registers struct {
 }
 
 type CPU struct {
-	Bus                    *Bus
-	Regs                   Registers
-	FetchedData            uint16
-	MemoryDestination      uint16
-	DestinationIsMemory    bool
-	CurrentOpcode          byte
-	Halted                 bool
-	Stepping               bool
-	InterruptMasterEnabled bool
-	CurrentInstruction     string
+	Bus      *Bus
+	Regs     Registers
+	Halted   bool
+	Stepping bool
 }
 
 func NewCPU(bus *Bus) *CPU {
 	cpu := CPU{}
 	cpu.Bus = bus
-	cpu.Regs = Registers{PC: 0x100}
+	cpu.Regs = Registers{}
 	cpu.Stepping = true
 
 	return &cpu
 }
 
-func (cpu *CPU) Step() error {
+func (cpu *CPU) Step() {
 	if !cpu.Halted {
-		err := cpu.fetchInstruction()
-		if err != nil {
-			return fmt.Errorf("Error fetching instruction: %s", err)
+		opcode := cpu.Bus.Read(cpu.Regs.PC)
+		cpu.Regs.PC++
+
+		fmt.Printf("%04X: (%02X %02X %02X) A: %02X B: %02X C: %02X\n", cpu.Regs.PC,
+			opcode, cpu.Bus.Read(cpu.Regs.PC), cpu.Bus.Read(cpu.Regs.PC+1), cpu.Regs.A, cpu.Regs.B, cpu.Regs.C)
+
+		switch opcode {
+
+		case 0x00:
+			// NOP
+		case 0x3C:
+			// INC A
+			cpu.Regs.A++
+
+			// Set appropriate flags
+			if cpu.Regs.A == 0 {
+				cpu.SetFlag(Z)
+			} else {
+				cpu.ClearFlag(Z)
+			}
+
+			cpu.ClearFlag(N)
+
+			if (cpu.Regs.A & 0x0F) == 0 {
+				cpu.SetFlag(H)
+			} else {
+				cpu.ClearFlag(H)
+			}
+		case 0xC3:
+			// JP a16
+			lo := cpu.Bus.Read(cpu.Regs.PC)
+			//     emu_cycles(1);
+			hi := cpu.Bus.Read(cpu.Regs.PC + 1)
+			// emu_cycles(1);
+			cpu.Regs.PC = uint16(hi)<<8 | uint16(lo)
+
+		case 0xE9:
+			// JP HL
+			val := uint16(cpu.Regs.H)<<8 | uint16(cpu.Regs.L)
+			cpu.Regs.PC = val
+
+		default:
+			fmt.Printf("\nINVALID INSTRUCTION! Unknown opcode: %02X\n", opcode)
+			os.Exit(1)
 		}
-		cpu.fetchData()
-		cpu.execute()
 	}
-
-	return nil
 }
 
-func (cpu *CPU) fetchInstruction() error {
-	opcode, err := cpu.Bus.Read(cpu.Regs.PC)
-	if err != nil {
-		return fmt.Errorf("Error fetching instruction at address %X", cpu.Regs.PC)
-	}
-	cpu.CurrentOpcode = opcode
-	cpu.CurrentInstruction, err = InstructionByOpcode(cpu.CurrentOpcode)
-	if err != nil {
-		return fmt.Errorf("Error translating opcode %02X: %s at PC: %04X", cpu.CurrentOpcode, err, cpu.Regs.PC)
-	}
-
-	fmt.Printf("Executing instruction: %02X	PC: %04X\n", cpu.CurrentOpcode, cpu.Regs.PC)
-
-	cpu.Regs.PC++
-
-	return nil
+func (cpu *CPU) SetFlag(flag CPUFlags) {
+	cpu.Regs.F |= flag
 }
 
-func (cpu *CPU) fetchData() {
-
+func (cpu *CPU) ClearFlag(flag CPUFlags) {
+	cpu.Regs.F &^= flag
 }
 
-func (cpu *CPU) execute() {
-	fmt.Println("Not executing yet...")
+func (cpu *CPU) ToggleFlag(flag CPUFlags) {
+	cpu.Regs.F ^= flag
+}
+
+func (cpu *CPU) IsFlagSet(flag CPUFlags) bool {
+	return cpu.Regs.F&flag != 0
 }

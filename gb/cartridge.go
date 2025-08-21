@@ -223,6 +223,7 @@ type ROMHeader struct {
 }
 
 type Cartridge struct {
+	Header      *ROMHeader
 	Data        []byte
 	Filename    string
 	Mapper      string
@@ -252,6 +253,7 @@ func InsertCartridge(filename string) (*Cartridge, error) {
 	if err != nil {
 		return &cart, nil
 	}
+	cart.Header = &header
 
 	// Convert some header values
 	cart.Title = string(bytes.Trim(header.Title[:], "\x00"))
