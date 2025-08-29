@@ -110,3 +110,27 @@ func (cpu *CPU) ToggleFlag(flag CPUFlags) {
 func (cpu *CPU) IsFlagSet(flag CPUFlags) bool {
 	return cpu.Regs.F&flag != 0
 }
+
+func (cpu *CPU) StackPush(data byte) {
+	cpu.Regs.SP--
+	cpu.Bus.Write(cpu.Regs.SP, data)
+}
+
+func (cpu *CPU) StackPush16(data uint16) {
+	cpu.StackPush(byte((data >> 8) & 0xFF))
+	cpu.StackPush(byte(data & 0xFF))
+}
+
+func (cpu *CPU) StackPop() byte {
+	val := cpu.Bus.Read(cpu.Regs.SP)
+	cpu.Regs.SP++
+
+	return val
+}
+
+func (cpu *CPU) StackPop16() uint16 {
+	lo := cpu.StackPop()
+	hi := cpu.StackPop()
+
+	return uint16(hi)<<8 | uint16(lo)
+}
