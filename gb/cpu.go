@@ -109,6 +109,20 @@ func (cpu *CPU) Step() {
 			cpu.Regs.PC++
 
 			switch cbOpcode {
+			case 0x7E:
+				// BIT 7, [HL]
+				// Read byte pointed to by address HL
+				address := uint16(cpu.Regs.H)<<8 | uint16(cpu.Regs.L)
+				val := cpu.Bus.Read(address)
+
+				// Check if bit 7 is set
+				if (val & 0x80) == 0 {
+					// Set zero flag if bit is not set
+					cpu.SetFlag(Z)
+				}
+				cpu.ClearFlag(N)
+				cpu.SetFlag(H)
+
 			default:
 				fmt.Printf("\nINVALID INSTRUCTION! Unknown CB opcode: %02X\n", cbOpcode)
 				os.Exit(1)

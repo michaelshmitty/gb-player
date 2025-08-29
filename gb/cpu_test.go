@@ -167,3 +167,22 @@ func TestInstruction21(t *testing.T) {
 	// Should increase the stack pointer
 	assert.Equal(t, uint16(0x3), cpu.Regs.PC)
 }
+
+func TestInstructionCB7E(t *testing.T) {
+	cpu := createCPU([]byte{0xCB, 0x7E, 0x00, 0x00})
+
+	cpu.Regs.H = 0xFF
+	cpu.Regs.L = 0x40
+	err := cpu.Bus.Write(0xFF40, 0xFF)
+	assert.Equal(t, err, nil)
+
+	// FIXME(m): This needs bus access to IO, in particular the LCD
+	// at 0xFF40.
+
+	// assert.Equal(t, 0xFF, cpu.Bus.Read(0xFF40))
+
+	// cpu.Step()
+
+	// // Should set the zero flag
+	// assert.True(t, cpu.IsFlagSet(Z))
+}
