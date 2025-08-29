@@ -30,16 +30,20 @@ type Registers struct {
 }
 
 type CPU struct {
-	Bus      *Bus
-	Regs     Registers
-	Halted   bool
-	Stepping bool
+	Bus                   *Bus
+	Regs                  Registers
+	Halted                bool
+	Stepping              bool
+	InterruptMasterEnable bool
 }
 
 func NewCPU(bus *Bus) *CPU {
 	cpu := CPU{}
 	cpu.Bus = bus
-	cpu.Regs = Registers{}
+	// NOTE(m): PC is usually set to 0x100 by the boot rom
+	// TODO(m): SP is usually set programmatically by the cartridge code.
+	// Remove this hardcoded value later!
+	cpu.Regs = Registers{PC: 0x100, SP: 0xDFFF}
 	cpu.Stepping = true
 
 	return &cpu
@@ -48,15 +52,34 @@ func NewCPU(bus *Bus) *CPU {
 func (cpu *CPU) Step() {
 	if !cpu.Halted {
 		opcode := cpu.Bus.Read(cpu.Regs.PC)
-		cpu.Regs.PC++
 
 		fmt.Printf("%04X: (%02X %02X %02X) A: %02X B: %02X C: %02X\n", cpu.Regs.PC,
-			opcode, cpu.Bus.Read(cpu.Regs.PC), cpu.Bus.Read(cpu.Regs.PC+1), cpu.Regs.A, cpu.Regs.B, cpu.Regs.C)
+			opcode, cpu.Bus.Read(cpu.Regs.PC+1), cpu.Bus.Read(cpu.Regs.PC+2), cpu.Regs.A, cpu.Regs.B, cpu.Regs.C)
+
+		cpu.Regs.PC++
 
 		switch opcode {
 
 		case 0x00:
 			// NOP
+
+		case 0x21:
+			// LD HL, n16
+			cpu.Regs.L = cpu.Bus.Read(cpu.Regs.PC)
+			//     emu_cycles(1);
+			cpu.Regs.H = cpu.Bus.Read(cpu.Regs.PC + 1)
+			// emu_cycles(1);
+			cpu.Regs.PC += 2
+
+		case 0x31:
+			// LD SP, n16
+			lo := cpu.Bus.Read(cpu.Regs.PC)
+			//     emu_cycles(1);
+			hi := cpu.Bus.Read(cpu.Regs.PC + 1)
+			// emu_cycles(1);
+			cpu.Regs.SP = uint16(lo) | uint16(hi)<<8
+			cpu.Regs.PC += 2
+
 		case 0x3C:
 			// INC A
 			cpu.Regs.A++
@@ -75,18 +98,48 @@ func (cpu *CPU) Step() {
 			} else {
 				cpu.ClearFlag(H)
 			}
+
+		case 0xCB:
+			// Prefix byte instructions
+			cbOpcode := cpu.Bus.Read(cpu.Regs.PC)
+
+			fmt.Printf("%04X: (%02X %02X %02X) A: %02X B: %02X C: %02X\n", cpu.Regs.PC,
+				cbOpcode, cpu.Bus.Read(cpu.Regs.PC+1), cpu.Bus.Read(cpu.Regs.PC+2), cpu.Regs.A, cpu.Regs.B, cpu.Regs.C)
+
+			cpu.Regs.PC++
+
+			switch cbOpcode {
+			default:
+				fmt.Printf("\nINVALID INSTRUCTION! Unknown CB opcode: %02X\n", cbOpcode)
+				os.Exit(1)
+			}
+
 		case 0xC3:
 			// JP a16
 			lo := cpu.Bus.Read(cpu.Regs.PC)
 			//     emu_cycles(1);
 			hi := cpu.Bus.Read(cpu.Regs.PC + 1)
 			// emu_cycles(1);
-			cpu.Regs.PC = uint16(hi)<<8 | uint16(lo)
+			cpu.Regs.PC = uint16(lo) | uint16(hi)<<8
+
+		case 0xCD:
+			// CALL a16
+			cpu.StackPush16(cpu.Regs.PC + 2)
+
+			lo := cpu.Bus.Read(cpu.Regs.PC)
+			//     emu_cycles(1);
+			hi := cpu.Bus.Read(cpu.Regs.PC + 1)
+			// emu_cycles(1);
+			cpu.Regs.PC = uint16(lo) | uint16(hi)<<8
 
 		case 0xE9:
 			// JP HL
 			val := uint16(cpu.Regs.H)<<8 | uint16(cpu.Regs.L)
 			cpu.Regs.PC = val
+
+		case 0xF3:
+			// DI
+			cpu.InterruptMasterEnable = false
 
 		default:
 			fmt.Printf("\nINVALID INSTRUCTION! Unknown opcode: %02X\n", opcode)
