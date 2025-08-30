@@ -43,7 +43,7 @@ func NewCPU(bus *Bus) *CPU {
 	// NOTE(m): PC is usually set to 0x100 by the boot rom
 	// TODO(m): SP is usually set programmatically by the cartridge code.
 	// Remove this hardcoded value later!
-	cpu.Regs = Registers{PC: 0x100, SP: 0xDFFF}
+	cpu.Regs = Registers{SP: 0xDFFF}
 	cpu.Stepping = true
 
 	return &cpu
@@ -63,6 +63,64 @@ func (cpu *CPU) Step() {
 		case 0x00:
 			// NOP
 
+		case 0x0E:
+			// LD C, n8
+			val := cpu.Bus.Read(cpu.Regs.PC)
+			//     emu_cycles(1);
+			cpu.Regs.C = val
+			cpu.Regs.PC++
+
+		case 0x10:
+			// STOP n8
+			cpu.Halted = true
+
+		case 0x11:
+			// LD DE, n16
+			cpu.Regs.E = cpu.Bus.Read(cpu.Regs.PC)
+			//     emu_cycles(1);
+			cpu.Regs.D = cpu.Bus.Read(cpu.Regs.PC + 1)
+			// emu_cycles(1);
+			cpu.Regs.PC += 2
+
+		case 0x12:
+			// LD [DE], A
+			// Get 16-bit address from DE
+			address := uint16(cpu.Regs.D)<<8 | uint16(cpu.Regs.E)
+			cpu.Bus.Write(address, cpu.Regs.A)
+
+		case 0x1C:
+			// INC E
+			cpu.Regs.E++
+
+			// Set appropriate flags
+			if cpu.Regs.E == 0 {
+				cpu.SetFlag(Z)
+			} else {
+				cpu.ClearFlag(Z)
+			}
+
+			cpu.ClearFlag(N)
+
+			if (cpu.Regs.E & 0x0F) == 0 {
+				cpu.SetFlag(H)
+			} else {
+				cpu.ClearFlag(H)
+			}
+
+		case 0x20:
+			// JR NZ, e8
+			if cpu.IsFlagSet(Z) {
+				// Z is set, don't execute
+				// emu_cycles(2);
+				cpu.Regs.PC++
+			} else {
+				// Z is not set, execute
+				// Jump relative to 8-bit signed offset
+				// emu_cycles(3);
+				offset := int8(cpu.Bus.Read(cpu.Regs.PC))
+				cpu.Regs.PC = uint16(int(cpu.Regs.PC) + int(offset))
+			}
+
 		case 0x21:
 			// LD HL, n16
 			cpu.Regs.L = cpu.Bus.Read(cpu.Regs.PC)
@@ -70,6 +128,19 @@ func (cpu *CPU) Step() {
 			cpu.Regs.H = cpu.Bus.Read(cpu.Regs.PC + 1)
 			// emu_cycles(1);
 			cpu.Regs.PC += 2
+
+		case 0x2A:
+			// LD A, [HL+] or LD A, [HLI]
+			// Get 16-bit address from HL
+			address := uint16(cpu.Regs.H)<<8 | uint16(cpu.Regs.L)
+			// Read byte at address and assign value to A register
+			cpu.Regs.A = cpu.Bus.Read(address)
+			// emu_cycles(1);
+			// Increment HL
+			address++
+			cpu.Regs.H = byte(address >> 8)
+			cpu.Regs.L = byte(address)
+			// emu_cycles(1);
 
 		case 0x31:
 			// LD SP, n16
@@ -99,6 +170,10 @@ func (cpu *CPU) Step() {
 				cpu.ClearFlag(H)
 			}
 
+		case 0x47:
+			// LD B, A
+			cpu.Regs.B = cpu.Regs.A
+
 		case 0xCB:
 			// Prefix byte instructions
 			cbOpcode := cpu.Bus.Read(cpu.Regs.PC)
@@ -109,19 +184,19 @@ func (cpu *CPU) Step() {
 			cpu.Regs.PC++
 
 			switch cbOpcode {
-			case 0x7E:
-				// BIT 7, [HL]
-				// Read byte pointed to by address HL
-				address := uint16(cpu.Regs.H)<<8 | uint16(cpu.Regs.L)
-				val := cpu.Bus.Read(address)
+			// case 0x7E:
+			// 	// BIT 7, [HL]
+			// 	// Read byte pointed to by address HL
+			// 	address := uint16(cpu.Regs.H)<<8 | uint16(cpu.Regs.L)
+			// 	val := cpu.Bus.Read(address)
 
-				// Check if bit 7 is set
-				if (val & 0x80) == 0 {
-					// Set zero flag if bit is not set
-					cpu.SetFlag(Z)
-				}
-				cpu.ClearFlag(N)
-				cpu.SetFlag(H)
+			// 	// Check if bit 7 is set
+			// 	if (val & 0x80) == 0 {
+			// 		// Set zero flag if bit is not set
+			// 		cpu.SetFlag(Z)
+			// 	}
+			// 	cpu.ClearFlag(N)
+			// 	cpu.SetFlag(H)
 
 			default:
 				fmt.Printf("\nINVALID INSTRUCTION! Unknown CB opcode: %02X\n", cbOpcode)
@@ -135,6 +210,11 @@ func (cpu *CPU) Step() {
 			hi := cpu.Bus.Read(cpu.Regs.PC + 1)
 			// emu_cycles(1);
 			cpu.Regs.PC = uint16(lo) | uint16(hi)<<8
+
+		// case 0xC9:
+		// 	// RET
+		// 	// emu_cycles(4);
+		// 	cpu.Regs.PC = cpu.StackPop16()
 
 		case 0xCD:
 			// CALL a16

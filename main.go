@@ -29,5 +29,6 @@ func main() {
 	running := true
 	for running {
 		console.CPU.Step()
+		running = !console.CPU.Halted
 	}
 }
