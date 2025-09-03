@@ -39,7 +39,11 @@ func (bus *Bus) Read(address uint16) byte {
 		}
 		return value
 	} else if address < 0xE000 {
+		//WRAM (Working RAM)
 		return bus.RAM.WRAMRead(address)
+	} else if address < 0xFF80 {
+		//IO Registers
+		return IORead(address)
 	} else {
 		fmt.Printf("Reading from bus address %X not implemented!\n", address)
 		return 0
@@ -62,7 +66,12 @@ func (bus *Bus) Write(address uint16, value byte) error {
 		}
 		return nil
 	} else if address < 0xE000 {
+		//WRAM (Working RAM)
 		bus.RAM.WRAMWrite(address, value)
+		return nil
+	} else if address < 0xFF80 {
+		//IO Registers
+		IOWrite(address, value)
 		return nil
 	} else {
 		return fmt.Errorf("Writing to bus address %X not implemented!", address)

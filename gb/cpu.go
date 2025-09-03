@@ -53,8 +53,9 @@ func (cpu *CPU) Step() {
 	if !cpu.Halted {
 		opcode := cpu.Bus.Read(cpu.Regs.PC)
 
-		fmt.Printf("%04X: (%02X %02X %02X) A: %02X B: %02X C: %02X\n", cpu.Regs.PC,
-			opcode, cpu.Bus.Read(cpu.Regs.PC+1), cpu.Bus.Read(cpu.Regs.PC+2), cpu.Regs.A, cpu.Regs.B, cpu.Regs.C)
+		fmt.Printf("%04X: (%02X %02X %02X) A: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X\n", cpu.Regs.PC,
+			opcode, cpu.Bus.Read(cpu.Regs.PC+1), cpu.Bus.Read(cpu.Regs.PC+2), cpu.Regs.A, cpu.Regs.B, cpu.Regs.C,
+			cpu.Regs.D, cpu.Regs.E, cpu.Regs.H, cpu.Regs.L)
 
 		cpu.Regs.PC++
 
@@ -62,6 +63,25 @@ func (cpu *CPU) Step() {
 
 		case 0x00:
 			// NOP
+
+		case 0x0D:
+			// DEC C
+			cpu.Regs.C--
+
+			// Set appropriate flags
+			if cpu.Regs.C == 0 {
+				cpu.SetFlag(Z)
+			} else {
+				cpu.ClearFlag(Z)
+			}
+
+			cpu.SetFlag(N)
+
+			if (cpu.Regs.C & 0x0F) == 0x0F {
+				cpu.SetFlag(H)
+			} else {
+				cpu.ClearFlag(H)
+			}
 
 		case 0x0E:
 			// LD C, n8
@@ -87,6 +107,25 @@ func (cpu *CPU) Step() {
 			// Get 16-bit address from DE
 			address := uint16(cpu.Regs.D)<<8 | uint16(cpu.Regs.E)
 			cpu.Bus.Write(address, cpu.Regs.A)
+
+		case 0x14:
+			// INC D
+			cpu.Regs.D++
+
+			// Set appropriate flags
+			if cpu.Regs.D == 0 {
+				cpu.SetFlag(Z)
+			} else {
+				cpu.ClearFlag(Z)
+			}
+
+			cpu.ClearFlag(N)
+
+			if (cpu.Regs.D & 0x0F) == 0 {
+				cpu.SetFlag(H)
+			} else {
+				cpu.ClearFlag(H)
+			}
 
 		case 0x1C:
 			// INC E
@@ -118,6 +157,7 @@ func (cpu *CPU) Step() {
 				// Jump relative to 8-bit signed offset
 				// emu_cycles(3);
 				offset := int8(cpu.Bus.Read(cpu.Regs.PC))
+				cpu.Regs.PC++
 				cpu.Regs.PC = uint16(int(cpu.Regs.PC) + int(offset))
 			}
 
@@ -170,9 +210,20 @@ func (cpu *CPU) Step() {
 				cpu.ClearFlag(H)
 			}
 
+		case 0x3E:
+			// LD A, n8
+			val := cpu.Bus.Read(cpu.Regs.PC)
+			//     emu_cycles(1);
+			cpu.Regs.A = val
+			cpu.Regs.PC++
+
 		case 0x47:
 			// LD B, A
 			cpu.Regs.B = cpu.Regs.A
+
+		case 0x78:
+			// LD A, B
+			cpu.Regs.A = cpu.Regs.B
 
 		case 0xCB:
 			// Prefix byte instructions
@@ -226,10 +277,27 @@ func (cpu *CPU) Step() {
 			// emu_cycles(1);
 			cpu.Regs.PC = uint16(lo) | uint16(hi)<<8
 
+		case 0xE0:
+			// LDH [a8], A
+			offset := cpu.Bus.Read(cpu.Regs.PC)
+			address := 0xFF00 | uint16(offset)
+			cpu.Bus.Write(address, cpu.Regs.A)
+			cpu.Regs.PC++
+
 		case 0xE9:
 			// JP HL
 			val := uint16(cpu.Regs.H)<<8 | uint16(cpu.Regs.L)
 			cpu.Regs.PC = val
+
+		case 0xEA:
+			// LD [a16], A
+			lo := cpu.Bus.Read(cpu.Regs.PC)
+			cpu.Regs.PC++
+			hi := cpu.Bus.Read(cpu.Regs.PC)
+			cpu.Regs.PC++
+
+			address := uint16(lo) | uint16(hi)<<8
+			cpu.Bus.Write(address, cpu.Regs.A)
 
 		case 0xF3:
 			// DI

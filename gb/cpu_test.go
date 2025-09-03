@@ -193,6 +193,9 @@ func TestInstruction47(t *testing.T) {
 
 	// Should load value in register A into register B
 	assert.Equal(t, byte(0xDE), cpu.Regs.B)
+
+	// Should increase the stack pointer
+	assert.Equal(t, uint16(0x1), cpu.Regs.PC)
 }
 
 func TestInstruction11(t *testing.T) {
@@ -312,14 +315,14 @@ func TestInstruction20(t *testing.T) {
 
 	cpu.Step()
 
-	assert.Equal(t, uint16(0x0B), cpu.Regs.PC)
+	assert.Equal(t, uint16(0x0C), cpu.Regs.PC)
 
 	// Should jump to negative offset if Z is not set
 	cpu = createCPU([]byte{0x20, 0xFB, 0x00})
 
 	cpu.Step()
 
-	assert.Equal(t, uint16(0xFFFC), cpu.Regs.PC)
+	assert.Equal(t, uint16(0xFFFD), cpu.Regs.PC)
 }
 
 func TestInstruction10(t *testing.T) {
@@ -328,4 +331,146 @@ func TestInstruction10(t *testing.T) {
 	cpu.Step()
 
 	assert.True(t, cpu.Halted)
+}
+
+func TestInstruction14(t *testing.T) {
+	// Should increment D register
+	cpu := createCPU([]byte{0x14, 0x00, 0x00})
+
+	cpu.Step()
+	assert.Equal(t, byte(0x01), cpu.Regs.D)
+
+	// Should clear Zero Flag
+	cpu = createCPU([]byte{0x14, 0x00, 0x00})
+
+	cpu.SetFlag(Z)
+	cpu.Step()
+	assert.False(t, cpu.IsFlagSet(Z))
+
+	// Should set Zero Flag
+	cpu = createCPU([]byte{0x14, 0x00, 0x00})
+	cpu.Regs.D = 0xFF
+
+	cpu.Step()
+	assert.True(t, cpu.IsFlagSet(Z))
+
+	// Should clear Subtract Flag
+	cpu = createCPU([]byte{0x14, 0x00, 0x00})
+
+	cpu.SetFlag(N)
+	cpu.Step()
+	assert.False(t, cpu.IsFlagSet(N))
+
+	// Should set Half Carry Flag if we overflow from bit 3
+	cpu = createCPU([]byte{0x14, 0x00, 0x00})
+	cpu.Regs.D = 0x0F
+
+	cpu.Step()
+	assert.True(t, cpu.IsFlagSet(H))
+
+	// Should clear Half Carry Flag if we don't overflow from bit 3
+	cpu = createCPU([]byte{0x14, 0x00, 0x00})
+
+	cpu.SetFlag(H)
+	cpu.Step()
+	assert.False(t, cpu.IsFlagSet(H))
+}
+
+func TestInstruction0D(t *testing.T) {
+	// Should decrement C register
+	cpu := createCPU([]byte{0x0D, 0x00, 0x00})
+	cpu.Regs.C = 0x01
+
+	cpu.Step()
+	assert.Equal(t, byte(0x00), cpu.Regs.C)
+
+	// Should clear Zero Flag
+	cpu = createCPU([]byte{0x0D, 0x00, 0x00})
+
+	cpu.SetFlag(Z)
+	cpu.Step()
+	assert.False(t, cpu.IsFlagSet(Z))
+
+	// Should set Zero Flag
+	cpu = createCPU([]byte{0x0D, 0x00, 0x00})
+	cpu.Regs.C = 0x01
+
+	cpu.Step()
+	assert.True(t, cpu.IsFlagSet(Z))
+
+	// Should set Subtract Flag
+	cpu = createCPU([]byte{0x0D, 0x00, 0x00})
+
+	cpu.SetFlag(N)
+	cpu.Step()
+	assert.True(t, cpu.IsFlagSet(N))
+
+	// Should set Half Carry Flag if we overflow from bit 3
+	cpu = createCPU([]byte{0x0D, 0x00, 0x00})
+	cpu.Regs.C = 0x10
+
+	cpu.Step()
+	assert.True(t, cpu.IsFlagSet(H))
+
+	// Should clear Half Carry Flag if we don't overflow from bit 3
+	cpu = createCPU([]byte{0x0D, 0x00, 0x00})
+	cpu.Regs.C = 0x01
+
+	cpu.SetFlag(H)
+	cpu.Step()
+	assert.False(t, cpu.IsFlagSet(H))
+}
+
+func TestInstruction78(t *testing.T) {
+	cpu := createCPU([]byte{0x78, 0x00, 0x00})
+
+	cpu.Regs.B = 0xDE
+
+	cpu.Step()
+
+	// Should load value in register B into register A
+	assert.Equal(t, byte(0xDE), cpu.Regs.A)
+
+	// Should increase the stack pointer
+	assert.Equal(t, uint16(0x1), cpu.Regs.PC)
+}
+
+func TestInstructionEA(t *testing.T) {
+	cpu := createCPU([]byte{0xEA, 0x23, 0xD1})
+	cpu.Regs.A = 0x42
+
+	cpu.Step()
+
+	// Should load byte in register A into the memory location pointed to by the 16-bit immediate value
+	val := cpu.Bus.Read(0xD123)
+	assert.Equal(t, byte(0x42), val)
+
+	// Should increase the stack pointer
+	assert.Equal(t, uint16(0x3), cpu.Regs.PC)
+}
+
+func TestInstruction3E(t *testing.T) {
+	cpu := createCPU([]byte{0x3E, 0xDE, 0x00})
+
+	cpu.Step()
+
+	// Should load the 8-bit immediate value into register A
+	assert.Equal(t, byte(0xDE), cpu.Regs.A)
+
+	// Should increase the stack pointer
+	assert.Equal(t, uint16(0x2), cpu.Regs.PC)
+}
+
+func TestInstructionE0(t *testing.T) {
+	cpu := createCPU([]byte{0xE0, 0x07, 0x00})
+	cpu.Regs.A = 0x42
+
+	cpu.Step()
+
+	// Should copy the value in register A into the byte at address 0xFF00 + 0x07
+	val := cpu.Bus.Read(0xFF07)
+	assert.Equal(t, byte(0x42), val)
+
+	// Should increase the stack pointer
+	assert.Equal(t, uint16(0x2), cpu.Regs.PC)
 }
