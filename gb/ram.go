@@ -21,7 +21,7 @@ func (ram *RAM) WRAMRead(address uint16) byte {
 	address -= 0xC000
 
 	if address >= 0x2000 {
-		fmt.Printf("Reading from WRAM: invalid address %X", address+0xC000)
+		fmt.Printf("Reading from WRAM: invalid address %X\n", address+0xC000)
 		os.Exit(1)
 	}
 
@@ -33,7 +33,7 @@ func (ram *RAM) WRAMWrite(address uint16, value byte) {
 	address -= 0xC000
 
 	if address >= 0x2000 {
-		fmt.Printf("Writing to WRAM: invalid address %X", address)
+		fmt.Printf("Writing to WRAM: invalid address %X\n", address)
 		os.Exit(1)
 	}
 

@@ -34,7 +34,7 @@ func (bus *Bus) Read(address uint16) byte {
 		// ROM data
 		value, err := bus.Cart.Read(address)
 		if err != nil {
-			fmt.Printf("Error reading from bus address %X: %s", address, err)
+			fmt.Printf("Error reading from bus address %X: %s\n", address, err)
 			return 0
 		}
 		return value

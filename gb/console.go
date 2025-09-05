@@ -15,6 +15,7 @@ type Console struct {
 	Bus   *Bus
 	CPU   *CPU
 	front *image.RGBA
+	Ticks uint64
 }
 
 func NewConsole(path string) (*Console, error) {
@@ -47,15 +48,25 @@ func NewConsole(path string) (*Console, error) {
 
 func (console *Console) StepMilliSeconds(ms uint64) {
 	speed := int(ms / 3)
-	for y := 0; y < ConsoleHeight; y++ {
-		for x := 0; x < ConsoleWidth; x++ {
+	for y := range ConsoleHeight {
+		for x := range ConsoleWidth {
 			console.front.Set(x, y, color.RGBA{0, uint8(y + speed), uint8(x + speed), 255})
 		}
 	}
-
 }
 
 func (console *Console) Buffer() *image.RGBA {
 
 	return console.front
+}
+
+func (console *Console) Cycle(cycles int) {
+	for range cycles {
+		// Cycles are given in M-cycles (machine cycles) instead of T-states (system clock ticks)
+		// One machine cycle takes 4 system clock ticks to complete
+		for range 4 {
+			console.Ticks++
+			timer.Tick()
+		}
+	}
 }

@@ -474,3 +474,47 @@ func TestInstructionE0(t *testing.T) {
 	// Should increase the stack pointer
 	assert.Equal(t, uint16(0x2), cpu.Regs.PC)
 }
+
+func TestInstruction7D(t *testing.T) {
+	cpu := createCPU([]byte{0x7D, 0x00, 0x00})
+
+	cpu.Regs.L = 0xDE
+
+	cpu.Step()
+
+	// Should load into register A the value in register L
+	assert.Equal(t, byte(0xDE), cpu.Regs.A)
+
+	// Should increase the stack pointer
+	assert.Equal(t, uint16(0x1), cpu.Regs.PC)
+}
+
+func TestInstruction7C(t *testing.T) {
+	cpu := createCPU([]byte{0x7C, 0x00, 0x00})
+
+	cpu.Regs.H = 0xDE
+
+	cpu.Step()
+
+	// Should load into register A the value in register H
+	assert.Equal(t, byte(0xDE), cpu.Regs.A)
+
+	// Should increase the stack pointer
+	assert.Equal(t, uint16(0x1), cpu.Regs.PC)
+}
+
+func TestInstruction18(t *testing.T) {
+	// Should jump to positive offset
+	cpu := createCPU([]byte{0x18, 0x0A, 0x00})
+
+	cpu.Step()
+
+	assert.Equal(t, uint16(0x0C), cpu.Regs.PC)
+
+	// Should jump to negative offset
+	cpu = createCPU([]byte{0x18, 0xFB, 0x00})
+
+	cpu.Step()
+
+	assert.Equal(t, uint16(0xFFFD), cpu.Regs.PC)
+}

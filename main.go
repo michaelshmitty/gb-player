@@ -9,10 +9,7 @@ import (
 	"gb-player/gb"
 )
 
-var running = true
-
 func main() {
-	// FIXME(m): Allow specifying rom file on command line
 	if len(os.Args) != 2 {
 		log.Fatalln("No rom file specified")
 	}
@@ -26,9 +23,8 @@ func main() {
 	}
 
 	fmt.Println("Executing instructions")
-	running := true
-	for running {
+
+	for !console.CPU.Halted {
 		console.CPU.Step()
-		running = !console.CPU.Halted
 	}
 }

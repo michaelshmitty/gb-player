@@ -35,6 +35,7 @@ type CPU struct {
 	Halted                bool
 	Stepping              bool
 	InterruptMasterEnable bool
+	InterruptFlags        byte
 }
 
 func NewCPU(bus *Bus) *CPU {
@@ -126,6 +127,14 @@ func (cpu *CPU) Step() {
 			} else {
 				cpu.ClearFlag(H)
 			}
+
+		case 0x18:
+			// JR e8
+			// Jump relative to 8-bit signed offset
+			// emu_cycles(3);
+			offset := int8(cpu.Bus.Read(cpu.Regs.PC))
+			cpu.Regs.PC++
+			cpu.Regs.PC = uint16(int(cpu.Regs.PC) + int(offset))
 
 		case 0x1C:
 			// INC E
@@ -225,6 +234,14 @@ func (cpu *CPU) Step() {
 			// LD A, B
 			cpu.Regs.A = cpu.Regs.B
 
+		case 0x7C:
+			// LD A, H
+			cpu.Regs.A = cpu.Regs.H
+
+		case 0x7D:
+			// LD A, L
+			cpu.Regs.A = cpu.Regs.L
+
 		case 0xCB:
 			// Prefix byte instructions
 			cbOpcode := cpu.Bus.Read(cpu.Regs.PC)
@@ -262,10 +279,10 @@ func (cpu *CPU) Step() {
 			// emu_cycles(1);
 			cpu.Regs.PC = uint16(lo) | uint16(hi)<<8
 
-		// case 0xC9:
-		// 	// RET
-		// 	// emu_cycles(4);
-		// 	cpu.Regs.PC = cpu.StackPop16()
+		case 0xC9:
+			// RET
+			// emu_cycles(4);
+			cpu.Regs.PC = cpu.StackPop16()
 
 		case 0xCD:
 			// CALL a16
@@ -283,6 +300,12 @@ func (cpu *CPU) Step() {
 			address := 0xFF00 | uint16(offset)
 			cpu.Bus.Write(address, cpu.Regs.A)
 			cpu.Regs.PC++
+
+		case 0xE5:
+			// PUSH HL
+			// emu_cycles(4);
+			cpu.StackPush(cpu.Regs.H)
+			cpu.StackPush(cpu.Regs.L)
 
 		case 0xE9:
 			// JP HL
@@ -348,4 +371,12 @@ func (cpu *CPU) StackPop16() uint16 {
 	hi := cpu.StackPop()
 
 	return uint16(hi)<<8 | uint16(lo)
+}
+
+func (cpu *CPU) GetInterruptFlags() byte {
+	return cpu.InterruptFlags
+}
+
+func (cpu *CPU) SetInterruptFlags(value byte) {
+	cpu.InterruptFlags = value
 }
